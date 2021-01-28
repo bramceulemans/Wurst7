@@ -38,8 +38,8 @@ import java.util.stream.Collectors;
 public final class SearchHack extends Hack
 		implements UpdateListener, PacketInputListener, RenderListener {
 	private final BlockListSetting block = new BlockListSetting("Block",
-			"The type of block to search for.", "minecraft:diamond_ore", "minecraft:nether_portal");
-
+			"The type of block to search for.",
+			"minecraft:diamond_ore", "minecraft:nether_portal");
 	private final EnumSetting<Area> area = new EnumSetting<>("Area",
 			"The area around the player to search in.\n"
 					+ "Higher values require a faster computer.",
@@ -156,7 +156,7 @@ public final class SearchHack extends Hack
 
 		addSearchersInRange(center, range, currentBlocks, dimensionId);
 		removeSearchersOutOfRange(center, range);
-		replaceSearchersWithDifferences(currentBlocks, dimensionId);
+		replaceSearchersWithDifferences(center, range, currentBlocks, dimensionId);
 		replaceSearchersWithChunkUpdate(currentBlocks, dimensionId);
 
 		if (!areAllChunkSearchersDone())
@@ -226,7 +226,7 @@ public final class SearchHack extends Hack
 
 	private void addSearchersInRange(ChunkPos center, int chunkRange,
 									 List<Block> blocks, int dimensionId) {
-		ArrayList<Chunk> chunksInRange = getChunksInRange(center, chunkRange);
+		List<Chunk> chunksInRange = getChunksInRange(center, chunkRange);
 
 		for (Chunk chunk : chunksInRange) {
 			if (searchers.containsKey(chunk)) {
@@ -271,7 +271,7 @@ public final class SearchHack extends Hack
 		}
 	}
 
-	private void replaceSearchersWithDifferences(List<Block> currentBlocks, int dimensionId) {
+	private void replaceSearchersWithDifferences(ChunkPos center, int range, List<Block> currentBlocks, int dimensionId) {
 		for (List<ChunkSearcher> oldSearchers : new ArrayList<>(searchers.values())) {
 			Set<String> oldBlockNames = oldSearchers.stream()
 					.map(ChunkSearcher::getBlock)
@@ -283,14 +283,16 @@ public final class SearchHack extends Hack
 			if (oldBlockNames.equals(currentBlockNames)) {
 				continue;
 			}
-			Chunk chunk = null;
-			for (ChunkSearcher oldSearcher : oldSearchers) {
-				if (chunk == null) {
-					chunk = oldSearcher.getChunk();
+			if (oldSearchers.size() > 0) {
+				Chunk chunk = null;
+				for (ChunkSearcher oldSearcher : oldSearchers) {
+					if (chunk == null) {
+						chunk = oldSearcher.getChunk();
+					}
+					removeSearcher(oldSearcher);
 				}
-				removeSearcher(oldSearcher);
+				addSearcher(chunk, currentBlocks, dimensionId);
 			}
-			addSearcher(chunk, currentBlocks, dimensionId);
 		}
 	}
 
@@ -378,12 +380,11 @@ public final class SearchHack extends Hack
 								.comparingInt(eyesPos::getManhattanDistance))
 						.limit(maxBlocks)
 						.collect(Collectors.toCollection(HashSet::new));
-
 		getMatchingBlocksTask = pool2.submit(task);
 	}
 
 	private HashSet<BlockPos> getMatchingBlocksFromTask() {
-		HashSet<BlockPos> matchingBlocks = new HashSet<>();
+		HashSet<BlockPos> matchingBlocks;
 
 		try {
 			matchingBlocks = getMatchingBlocksTask.get();
@@ -454,7 +455,7 @@ public final class SearchHack extends Hack
 		private final String name;
 		private final int chunkRange;
 
-		private Area(String name, int chunkRange) {
+		Area(String name, int chunkRange) {
 			this.name = name;
 			this.chunkRange = chunkRange;
 		}
